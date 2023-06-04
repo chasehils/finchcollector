@@ -1,5 +1,6 @@
 from django.db import models
 from django.urls import reverse
+from datetime import date
 
 
 
@@ -24,9 +25,11 @@ class Finch(models.Model):
     
     def get_absolute_url(self):
         return reverse('detail', kwargs={'finch_id': self.id})
+    def fed_for_today(self):
+        return self.feeding_set.filter(date=date.today()).count() >= len(MEALS)
     
 class Feeding(models.Model):
-    date = models.DateField()
+    date = models.DateField('feeding date')
     meal = models.CharField(
         max_length=1,
         # add the 'choices' field option
@@ -34,7 +37,12 @@ class Feeding(models.Model):
         # set the default value for meal to be 'B'
         default=MEALS[0][0]
         )
+    # create a finch_id foreign key
+    finch = models.ForeignKey(Finch, on_delete=models.CASCADE)
     
     def __str__(self):
         # nice method for obtaining the friendly value of a Field.choice
         return f"{self.get_meal_display()} on {self.date}"
+    
+    class Meta:
+        ordering = ['-date']
