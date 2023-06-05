@@ -7,9 +7,6 @@ from django.views.generic import ListView, DetailView
 from .models import Finch, Birdhouse, Photo
 from .forms import FeedingForm
 
-
-
-
 # Create your views here.
 
 def home(request):
@@ -38,7 +35,7 @@ def finches_detail(request, finch_id):
 
 class FinchCreate(CreateView):
     model = Finch
-    fields = '__all__'
+    fields = ['name', 'breed', 'description', 'age']
   
 class FinchUpdate(UpdateView):
     model = Finch
@@ -56,6 +53,14 @@ def add_feeding(request, finch_id):
         new_feeding.finch_id = finch_id
         new_feeding.save()
     return redirect ('detail', finch_id=finch_id)
+
+def assoc_birdhouse(request, finch_id, birdhouse_id):
+    Finch.objects.get(id=finch_id).birdhouses.add(birdhouse_id)
+    return redirect('detail', finch_id=finch_id)
+
+def unassoc_birdhouse(request, finch_id, birdhouse_id):
+    Finch.objects.get(id=finch_id).birdhouses.remove(birdhouse_id)
+    return redirect('detail', finch_id=finch_id)
 
 class BirdhouseList(ListView):
     model = Birdhouse
@@ -75,25 +80,24 @@ class BirdhouseDelete(DeleteView):
     model = Birdhouse 
     success_url = '/birdhouses'
 
-def assoc_birdhouse(request, finch_id, birdhouse_id):
-    Finch.objects.get(id=finch_id).birdhouses.remove(birdhouse_id)
-    return redirect('detail', finch_id=finch_id)
 
-def unassoc_birdhouse(request, finch_id, birdhouse_id):
-    Finch.objects.get(id=finch_id).birdhouses.remove(birdhouse_id)
-    return redirect('detail', finch_id=finch_id)
+
 
 def add_photo(request, finch_id):
-    photo_file = request.FILES.get('photo-file', None)
-    if photo_file:
-        s3 = boto3.client('s3')
-        key = uuid4().hex[:6] + photo_file.name[photo_file.name.rfind('.')]
-        try:
-            bucket = os.environ['S3_BICKET']
-            s3.upload_fileobj(photo_file, key)
-            url = f"{os.environ['S#_BASE_URL']}{bucket}/{key}"
-            Photo.objects.create(url=url, finch_id=finch_id)
-        except Exception as e:
-            print('An error occured uploading file to S3')
-            print(e)
-    return redirect('detail', finch_id=finch_id)
+  # photo-file maps to the "name" attr on the <input>
+  photo_file = request.FILES.get('photo-file', None)
+  if photo_file:
+    s3 = boto3.client('s3')
+    # Need a unique "key" (filename)
+    # It needs to keep the same file extension
+    # of the file that was uploaded (.png, .jpeg, etc.)
+    key = uuid.uuid4().hex[:6] + photo_file.name[photo_file.name.rfind('.'):]
+    try:
+      bucket = os.environ['S3_BUCKET']
+      s3.upload_fileobj(photo_file, bucket, key)
+      url = f"{os.environ['S3_BASE_URL']}{bucket}/{key}"
+      Photo.objects.create(url=url, finch_id=finch_id)
+    except Exception as e:
+      print('An error occurred uploading file to S3')
+      print(e)
+  return redirect('detail', finch_id=finch_id)
